@@ -7,29 +7,27 @@
 
 ## Overview
 
-An interactive art page where a model photo serves as the background canvas, with seed-based scattered dots overlaid on top. Users click dots to connect them with glowing constellation lines, creating a personal star-map artwork. The result can be saved as a PNG.
+An interactive art page where a user uploads a model photo as the background canvas, with seed-based scattered dots overlaid on top. Users click dots to connect them with orange constellation lines, creating a personal star-map artwork. The result can be saved as a PNG.
 
 ---
 
 ## Core Concept
 
-- Model photo fills the screen, darkened to ~60% opacity so dots and lines read clearly
-- 50–100 glowing dots are scattered over the photo at load time, placement determined by a seed value
-- User clicks any dot to select it (turns orange/highlighted), then clicks a second dot to draw a glowing line between them
+- User uploads a photo via drag & drop → photo fills the screen at full brightness (no darkening)
+- Up to 15 orange dots are scattered over the photo at load time, placement determined by a fixed seed
+- User clicks any dot to select it (highlighted orange), then clicks a second dot to draw an orange line between them
 - Repeating this builds up a constellation pattern
-- Same seed always produces the same dot layout — different seeds produce entirely different compositions
+- Same seed always produces the same dot layout for a given photo dimensions
 
 ---
 
 ## Interaction Flow
 
-1. Page loads → photo fills screen → dots appear with subtle glow
-2. User clicks dot A → dot turns orange (selected state)
-3. User clicks dot B → line appears between A and B, both dots return to white
-4. Continue clicking to add more connections
-5. `↻ New` button → regenerates with a new random seed (clears all lines)
-6. `⟵ Undo` button → removes the last drawn line
-7. `💾 Save` button → downloads the current canvas as PNG named `constellation-{seed}.png`
+1. **Photo upload** → drag & drop a photo onto the canvas → dots auto-placed (up to 15)
+2. Click dot A → dot activates (highlighted)
+3. Click dot B → orange line connects A and B, both stay orange
+4. Continue clicking to complete the constellation
+5. `💾 Save` button → downloads the current canvas as PNG
 
 ---
 
@@ -37,26 +35,22 @@ An interactive art page where a model photo serves as the background canvas, wit
 
 | Element | Spec |
 |---|---|
-| Background photo | Full-screen, `object-fit: cover`, dimmed with dark overlay |
-| Dark overlay | `rgba(0, 0, 10, 0.45)` — preserves photo while making dots pop |
-| Dots | Radius 5–7px, white fill, soft glow (`box-shadow` or Canvas `shadowBlur`) |
-| Selected dot | Orange (#d97757) with stronger glow |
-| Lines | 1.5px stroke, `rgba(200, 210, 255, 0.55)`, glow effect |
-| UI overlay | Fixed bottom-right corner, dark semi-transparent pill |
-| Font | Poppins or system monospace for seed number |
+| Background photo | Full-screen, `object-fit: cover`, **no dark overlay** — full brightness |
+| Dots | Radius 6–8px, **orange (#d97757)** fill, subtle glow |
+| Selected dot | Brighter orange with stronger glow to indicate active state |
+| Lines | 2px stroke, **orange (#d97757)**, subtle glow effect |
+| UI overlay | Minimal, fixed bottom-right corner |
 
 ---
 
 ## UI Controls (minimal, bottom-right)
 
 ```
-[ seed: 2847 ]  [ ↻ New ]  [ ⟵ Undo ]  [ 💾 Save ]
+[ 📁 Upload Photo ]  [ 💾 Save PNG ]
 ```
 
-- Seed display is read-only (shows current seed)
-- `↻ New` generates a random seed and resets
-- `⟵ Undo` removes the last connection
-- `💾 Save` exports PNG
+- `📁 Upload Photo` — opens file picker (also supports drag & drop onto canvas)
+- `💾 Save PNG` — exports the full canvas (photo + dots + lines) as PNG
 
 ---
 
@@ -65,9 +59,9 @@ An interactive art page where a model photo serves as the background canvas, wit
 | Decision | Choice | Reason |
 |---|---|---|
 | Stack | Single HTML file | No build step, instant open in browser |
-| Canvas | HTML5 Canvas API (vanilla) | No dependencies beyond the photo |
-| Randomness | Seeded PRNG (mulberry32) | Reproducible dot placement from seed |
-| Photo loading | `<img>` embedded or drag-and-drop | Works offline, no server needed |
+| Canvas | HTML5 Canvas API (vanilla) | No dependencies |
+| Randomness | Seeded PRNG (mulberry32) | Reproducible dot placement |
+| Photo loading | Drag & drop + file input | Works offline, no server needed |
 | Export | `canvas.toDataURL('image/png')` | Built-in, no library needed |
 
 ### Seeded Dot Placement
@@ -80,7 +74,7 @@ function mulberry32(seed) {
   }
 }
 
-function generateDots(seed, count = 70) {
+function generateDots(seed, count = 15) {
   const rand = mulberry32(seed);
   return Array.from({ length: count }, () => ({
     x: rand() * canvas.width,
@@ -97,6 +91,7 @@ const state = {
   dots: [],          // { x, y }[]
   connections: [],   // [dotIndexA, dotIndexB][]
   selected: null,    // dot index or null
+  photo: null,       // ImageBitmap
 };
 ```
 
@@ -104,17 +99,17 @@ const state = {
 
 ## Photo Integration
 
-- Default: one model photo embedded as a base64 data URL or local file reference
-- Optional (v2): drag-and-drop a photo onto the canvas to replace it
-- The photo renders to the canvas first, then dots and lines draw on top
+- User drags a photo onto the canvas or clicks the upload button
+- Photo renders to canvas at full brightness (no overlay)
+- Dots and lines render on top of the photo
 
 ---
 
 ## Out of Scope (this version)
 
-- Multiple photo switching
+- Seed navigation / changing dot layout
+- Undo (can be added later)
 - Named constellation labels
-- Sharing via URL (would need a backend)
 - Mobile touch optimization (desktop-first)
 
 ---
@@ -130,10 +125,8 @@ interactive-art/
 
 ## Success Criteria
 
-- [ ] Photo fills screen, looks beautiful
-- [ ] Dots appear correctly for a given seed (same seed = same layout every time)
-- [ ] Click-to-connect works reliably
-- [ ] Lines glow and look like constellations
-- [ ] Undo removes the last line
-- [ ] Save exports a clean PNG
-- [ ] New seed button produces a fresh layout
+- [ ] Drag & drop photo upload works
+- [ ] Photo fills screen at full brightness
+- [ ] Up to 15 orange dots appear at consistent positions for a given seed
+- [ ] Click-to-connect draws orange lines between dots
+- [ ] Save exports a clean PNG with photo + constellation
