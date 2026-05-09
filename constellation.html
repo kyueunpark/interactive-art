@@ -353,7 +353,7 @@ function render() {
   // 2. Completed lines
   if (state.connections.length > 0) {
     ctx.strokeStyle = '#22c55e';
-    ctx.lineWidth = 2.8;
+    ctx.lineWidth = 7.2;
     ctx.shadowColor = '#22c55e';
     ctx.shadowBlur = 10;
     ctx.lineCap = 'round';
@@ -371,7 +371,7 @@ function render() {
   if (state.dragging && state.dragPos) {
     const from = state.dots[state.connections.length];
     ctx.strokeStyle = '#22c55e';
-    ctx.lineWidth = 2.8;
+    ctx.lineWidth = 7.2;
     ctx.shadowColor = '#22c55e';
     ctx.shadowBlur = 6;
     ctx.lineCap = 'round';
