@@ -105,7 +105,80 @@
   <input type="file" id="file-input" accept="image/*">
 
   <script>
-    // JS goes here in subsequent tasks
+// ─── State ───────────────────────────────────────────────────────────────────
+const state = {
+  seed: 42,
+  photo: null,       // HTMLImageElement
+  dots: [],          // [{x, y}]
+  connections: [],   // [[indexA, indexB]]
+  selected: null,    // dot index or null
+};
+
+// ─── Canvas refs ─────────────────────────────────────────────────────────────
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const dropZone = document.getElementById('drop-zone');
+const controls = document.getElementById('controls');
+
+// ─── Photo loading ────────────────────────────────────────────────────────────
+function loadPhoto(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+
+  img.onload = () => {
+    state.photo = img;
+
+    // Fit photo to viewport while preserving aspect ratio
+    const maxW = window.innerWidth;
+    const maxH = window.innerHeight;
+    const ratio = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight);
+    canvas.width  = Math.round(img.naturalWidth  * ratio);
+    canvas.height = Math.round(img.naturalHeight * ratio);
+
+    dropZone.classList.add('hidden');
+    controls.style.display = 'flex';
+    generateDots();
+    render();
+    URL.revokeObjectURL(url);
+  };
+
+  img.src = url;
+}
+
+// ─── Drag & drop ─────────────────────────────────────────────────────────────
+document.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  document.body.classList.add('drag-over');
+});
+
+document.addEventListener('dragleave', (e) => {
+  if (e.relatedTarget === null) document.body.classList.remove('drag-over');
+});
+
+document.addEventListener('drop', (e) => {
+  e.preventDefault();
+  document.body.classList.remove('drag-over');
+  loadPhoto(e.dataTransfer.files[0]);
+});
+
+// ─── File input ───────────────────────────────────────────────────────────────
+const fileInput = document.getElementById('file-input');
+fileInput.addEventListener('change', () => loadPhoto(fileInput.files[0]));
+
+document.getElementById('upload-btn').addEventListener('click',  () => fileInput.click());
+document.getElementById('upload-btn-2').addEventListener('click', () => fileInput.click());
+
+// ─── Render (stub — draws photo only for now) ─────────────────────────────────
+function generateDots() {}  // stub — replaced in Task 3
+
+function render() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (state.photo) {
+    ctx.drawImage(state.photo, 0, 0, canvas.width, canvas.height);
+  }
+}
   </script>
 </body>
 </html>
