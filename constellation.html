@@ -36,7 +36,6 @@
       color: #888;
       font-size: 18px;
       gap: 16px;
-      pointer-events: none;
     }
 
     #drop-zone.hidden { display: none; }
@@ -48,7 +47,7 @@
       position: fixed;
       bottom: 24px;
       right: 24px;
-      display: flex;
+      display: none;
       gap: 10px;
       align-items: center;
     }
@@ -77,7 +76,6 @@
     /* drag-over highlight */
     body.drag-over #drop-zone {
       background: rgba(217, 119, 87, 0.05);
-      pointer-events: auto;
     }
   </style>
 </head>
