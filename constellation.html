@@ -221,7 +221,8 @@ function render() {
     ctx.fill();
   }
 
-  ctx.shadowBlur = 0; // reset shadow so it doesn't bleed elsewhere
+  ctx.shadowBlur = 0;
+  ctx.shadowColor = 'transparent'; // reset shadow so it doesn't bleed into lines (Task 4)
 }
   </script>
 </body>
