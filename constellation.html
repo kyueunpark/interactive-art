@@ -248,7 +248,7 @@ function getCanvasPos(e) {
 
 // ─── Hit test ─────────────────────────────────────────────────────────────────
 function findDotAt(x, y) {
-  const HIT = 22;
+  const HIT = 24;
   for (let i = 0; i < state.dots.length; i++) {
     const dx = state.dots[i].x - x;
     const dy = state.dots[i].y - y;
@@ -306,7 +306,8 @@ canvas.addEventListener('mousemove', (e) => {
   }
 });
 
-canvas.addEventListener('mouseup', (e) => {
+// mouseup on document so drag release works even outside the canvas
+document.addEventListener('mouseup', (e) => {
   if (!state.photo || !state.dragging) return;
   const { x, y } = getCanvasPos(e);
   const nextFrom = state.connections.length;
@@ -391,7 +392,7 @@ function render() {
   for (let i = 0; i < state.dots.length; i++) {
     const { x, y } = state.dots[i];
     const isNext = i === nextFrom && nextFrom < state.dots.length - 1;
-    const radius = isNext ? 9 : 7;
+    const radius = isNext ? 10 : 8;
 
     ctx.beginPath();
     ctx.arc(x, y, radius, 0, Math.PI * 2);
