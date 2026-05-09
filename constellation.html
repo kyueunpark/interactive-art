@@ -184,6 +184,36 @@ fileInput.addEventListener('change', () => {
 document.getElementById('upload-btn').addEventListener('click',  () => fileInput.click());
 document.getElementById('upload-btn-2').addEventListener('click', () => fileInput.click());
 
+canvas.addEventListener('click', (e) => {
+  if (!state.photo) return; // ignore clicks before photo is loaded
+
+  // Convert screen coords → canvas coords (handles CSS scaling)
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width  / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const x = (e.clientX - rect.left) * scaleX;
+  const y = (e.clientY - rect.top)  * scaleY;
+
+  const hit = findDotAt(x, y);
+
+  if (hit === null) {
+    // Clicked empty space — deselect
+    state.selected = null;
+  } else if (state.selected === null) {
+    // No dot selected yet — select this one
+    state.selected = hit;
+  } else if (state.selected === hit) {
+    // Clicked same dot — deselect
+    state.selected = null;
+  } else {
+    // Second dot clicked — add connection
+    state.connections.push([state.selected, hit]);
+    state.selected = null;
+  }
+
+  render();
+});
+
 // ─── Render (stub — draws photo only for now) ─────────────────────────────────
 function generateDots() {
   const rand = mulberry32(state.seed);
@@ -192,6 +222,16 @@ function generateDots() {
     x: pad + rand() * (canvas.width  - pad * 2),
     y: pad + rand() * (canvas.height - pad * 2),
   }));
+}
+
+function findDotAt(x, y) {
+  const HIT = 22; // hit radius in canvas pixels — slightly larger than dot
+  for (let i = 0; i < state.dots.length; i++) {
+    const dx = state.dots[i].x - x;
+    const dy = state.dots[i].y - y;
+    if (dx * dx + dy * dy <= HIT * HIT) return i;
+  }
+  return null;
 }
 
 function render() {
@@ -205,8 +245,21 @@ function render() {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
 
-  // 2. Lines (drawn before dots so dots appear on top)
-  // — added in Task 4
+  // 2. Lines
+  if (state.connections.length > 0) {
+    ctx.strokeStyle = '#d97757';
+    ctx.lineWidth = 2;
+    ctx.shadowColor = '#d97757';
+    ctx.shadowBlur = 10;
+    ctx.lineCap = 'round';
+
+    for (const [i, j] of state.connections) {
+      ctx.beginPath();
+      ctx.moveTo(state.dots[i].x, state.dots[i].y);
+      ctx.lineTo(state.dots[j].x, state.dots[j].y);
+      ctx.stroke();
+    }
+  }
 
   // 3. Dots
   for (let i = 0; i < state.dots.length; i++) {
