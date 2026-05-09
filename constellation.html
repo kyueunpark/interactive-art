@@ -216,6 +216,25 @@ canvas.addEventListener('click', (e) => {
   render();
 });
 
+document.getElementById('save-btn').addEventListener('click', () => {
+  if (!state.photo) return;
+
+  const link = document.createElement('a');
+  link.download = `constellation-${state.seed}.png`;
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  if (!state.photo) return;
+
+  const rect = canvas.getBoundingClientRect();
+  const x = (e.clientX - rect.left) * (canvas.width  / rect.width);
+  const y = (e.clientY - rect.top)  * (canvas.height / rect.height);
+
+  canvas.style.cursor = findDotAt(x, y) !== null ? 'pointer' : 'crosshair';
+});
+
 // ─── Render (stub — draws photo only for now) ─────────────────────────────────
 function generateDots() {
   const rand = mulberry32(state.seed);
