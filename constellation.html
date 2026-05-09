@@ -119,8 +119,6 @@
 
   <div id="controls">
     <button class="btn" id="connect-btn" disabled>✦ 선 잇기</button>
-    <button class="btn" id="upload-btn-2">📁 사진 바꾸기</button>
-    <button class="btn" id="save-btn">💾 저장</button>
   </div>
 
   <input type="file" id="file-input" accept="image/*">
@@ -163,7 +161,7 @@ function updateHint() {
   } else {
     const nextFrom = state.connections.length;
     if (nextFrom >= state.dots.length - 1) {
-      hintEl.textContent = '완성! 💾 저장으로 PNG 다운로드';
+      hintEl.textContent = '완성! S키로 PNG 저장';
     } else {
       hintEl.textContent = `${nextFrom + 1}번 점에서 드래그 → ${nextFrom + 2}번 점으로`;
     }
@@ -227,8 +225,7 @@ fileInput.addEventListener('change', () => {
   fileInput.value = '';
 });
 
-document.getElementById('upload-btn').addEventListener('click',  () => fileInput.click());
-document.getElementById('upload-btn-2').addEventListener('click', () => fileInput.click());
+document.getElementById('upload-btn').addEventListener('click', () => fileInput.click());
 
 // ─── "선 잇기" button — switch to connecting mode ─────────────────────────────
 connectBtn.addEventListener('click', () => {
@@ -325,15 +322,19 @@ canvas.addEventListener('mouseup', (e) => {
   render();
 });
 
-// ─── Save ─────────────────────────────────────────────────────────────────────
-document.getElementById('save-btn').addEventListener('click', () => {
+// ─── Save (S key) ─────────────────────────────────────────────────────────────
+function saveCanvas() {
   if (!state.photo) return;
   const link = document.createElement('a');
-  link.download = `constellation.png`;
+  link.download = 'constellation.png';
   link.href = canvas.toDataURL('image/png');
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 's' || e.key === 'S') saveCanvas();
 });
 
 // ─── Render ───────────────────────────────────────────────────────────────────
@@ -394,12 +395,8 @@ function render() {
 
     ctx.beginPath();
     ctx.arc(x, y, radius, 0, Math.PI * 2);
-    ctx.fillStyle = '#a855f7';
-    ctx.shadowColor = isNext ? '#d8b4fe' : '#a855f7';
-    ctx.shadowBlur = isNext ? 22 : 12;
+    ctx.fillStyle = isNext ? '#4ade80' : '#22c55e';
     ctx.fill();
-    ctx.shadowBlur = 0;
-    ctx.shadowColor = 'transparent';
 
     // Number label
     ctx.fillStyle = '#ffffff';
