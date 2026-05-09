@@ -352,9 +352,9 @@ function render() {
 
   // 2. Completed lines
   if (state.connections.length > 0) {
-    ctx.strokeStyle = '#a855f7';
-    ctx.lineWidth = 2;
-    ctx.shadowColor = '#a855f7';
+    ctx.strokeStyle = '#22c55e';
+    ctx.lineWidth = 2.8;
+    ctx.shadowColor = '#22c55e';
     ctx.shadowBlur = 10;
     ctx.lineCap = 'round';
     for (const [i, j] of state.connections) {
@@ -370,9 +370,9 @@ function render() {
   // 3. Drag preview
   if (state.dragging && state.dragPos) {
     const from = state.dots[state.connections.length];
-    ctx.strokeStyle = '#a855f7';
-    ctx.lineWidth = 2;
-    ctx.shadowColor = '#a855f7';
+    ctx.strokeStyle = '#22c55e';
+    ctx.lineWidth = 2.8;
+    ctx.shadowColor = '#22c55e';
     ctx.shadowBlur = 6;
     ctx.lineCap = 'round';
     ctx.setLineDash([6, 8]);
