@@ -165,7 +165,10 @@ document.addEventListener('drop', (e) => {
 
 // ─── File input ───────────────────────────────────────────────────────────────
 const fileInput = document.getElementById('file-input');
-fileInput.addEventListener('change', () => loadPhoto(fileInput.files[0]));
+fileInput.addEventListener('change', () => {
+  loadPhoto(fileInput.files[0]);
+  fileInput.value = '';
+});
 
 document.getElementById('upload-btn').addEventListener('click',  () => fileInput.click());
 document.getElementById('upload-btn-2').addEventListener('click', () => fileInput.click());
