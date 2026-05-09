@@ -7,7 +7,7 @@
   <style>
     :root {
       --color-bg: #0a0a0f;
-      --color-accent: #d97757;
+      --color-accent: #a855f7;
       --color-surface: rgba(20, 20, 30, 0.85);
       --color-muted: #888;
       --radius-btn: 8px;
@@ -30,7 +30,7 @@
       display: block;
       max-width: 100vw;
       max-height: 100vh;
-      cursor: crosshair;
+      cursor: default;
     }
 
     /* Drop zone shown before photo is uploaded */
@@ -62,7 +62,7 @@
 
     .btn {
       background: var(--color-surface);
-      border: 1px solid rgba(217, 119, 87, 0.4);
+      border: 1px solid rgba(168, 85, 247, 0.4);
       color: var(--color-accent);
       padding: 10px 18px;
       border-radius: var(--radius-btn);
@@ -74,7 +74,7 @@
     }
 
     .btn:hover {
-      background: rgba(217, 119, 87, 0.15);
+      background: rgba(168, 85, 247, 0.15);
       border-color: var(--color-accent);
     }
 
@@ -83,7 +83,7 @@
 
     /* drag-over highlight */
     body.drag-over #drop-zone {
-      background: rgba(217, 119, 87, 0.05);
+      background: rgba(168, 85, 247, 0.05);
     }
   </style>
 </head>
@@ -121,8 +121,9 @@ const state = {
   seed: 42,
   photo: null,       // HTMLImageElement
   dots: [],          // [{x, y}]
-  connections: [],   // [[indexA, indexB]]
-  selected: null,    // dot index or null
+  connections: [],   // [[indexA, indexB]] — always sequential: [0,1],[1,2],...
+  dragging: false,
+  dragPos: null,     // {x, y} current mouse position while dragging
 };
 
 // ─── Canvas refs ─────────────────────────────────────────────────────────────
@@ -130,6 +131,33 @@ const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 const dropZone = document.getElementById('drop-zone');
 const controls = document.getElementById('controls');
+
+// ─── Edge detection (Sobel) for contour-based dot placement ──────────────────
+function detectEdgePixels(imageData, width, height) {
+  const data = imageData.data;
+  const edges = [];
+  const pad = 50;
+
+  const getLum = (x, y) => {
+    const i = (y * width + x) * 4;
+    return 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+  };
+
+  for (let y = pad; y < height - pad; y++) {
+    for (let x = pad; x < width - pad; x++) {
+      const gx =
+        -getLum(x-1, y-1) + getLum(x+1, y-1) +
+        -2 * getLum(x-1, y) + 2 * getLum(x+1, y) +
+        -getLum(x-1, y+1) + getLum(x+1, y+1);
+      const gy =
+        -getLum(x-1, y-1) - 2 * getLum(x, y-1) - getLum(x+1, y-1) +
+        getLum(x-1, y+1) + 2 * getLum(x, y+1) + getLum(x+1, y+1);
+      const mag = Math.sqrt(gx * gx + gy * gy);
+      if (mag > 40) edges.push({ x, y });
+    }
+  }
+  return edges;
+}
 
 // ─── Photo loading ────────────────────────────────────────────────────────────
 function loadPhoto(file) {
@@ -141,7 +169,6 @@ function loadPhoto(file) {
   img.onload = () => {
     state.photo = img;
 
-    // Fit photo to viewport while preserving aspect ratio
     const maxW = window.innerWidth;
     const maxH = window.innerHeight;
     const ratio = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight);
@@ -149,7 +176,8 @@ function loadPhoto(file) {
     canvas.height = Math.round(img.naturalHeight * ratio);
 
     state.connections = [];
-    state.selected = null;
+    state.dragging = false;
+    state.dragPos = null;
     dropZone.classList.add('hidden');
     controls.style.display = 'flex';
     generateDots();
@@ -160,7 +188,7 @@ function loadPhoto(file) {
   img.src = url;
 }
 
-// ─── Drag & drop ─────────────────────────────────────────────────────────────
+// ─── Drag & drop (photo upload) ───────────────────────────────────────────────
 document.addEventListener('dragover', (e) => {
   e.preventDefault();
   document.body.classList.add('drag-over');
@@ -186,41 +214,61 @@ fileInput.addEventListener('change', () => {
 document.getElementById('upload-btn').addEventListener('click',  () => fileInput.click());
 document.getElementById('upload-btn-2').addEventListener('click', () => fileInput.click());
 
-canvas.addEventListener('click', (e) => {
-  if (!state.photo) return; // ignore clicks before photo is loaded
-
-  // Convert screen coords → canvas coords (handles CSS scaling)
+// ─── Canvas interaction — drag to connect in sequence ────────────────────────
+function getCanvasPos(e) {
   const rect = canvas.getBoundingClientRect();
-  const scaleX = canvas.width  / rect.width;
-  const scaleY = canvas.height / rect.height;
-  const x = (e.clientX - rect.left) * scaleX;
-  const y = (e.clientY - rect.top)  * scaleY;
+  return {
+    x: (e.clientX - rect.left) * (canvas.width  / rect.width),
+    y: (e.clientY - rect.top)  * (canvas.height / rect.height),
+  };
+}
 
-  const hit = findDotAt(x, y);
+canvas.addEventListener('mousedown', (e) => {
+  if (!state.photo) return;
+  const { x, y } = getCanvasPos(e);
+  const nextFrom = state.connections.length;
+  if (nextFrom >= state.dots.length - 1) return; // all connected
+  if (findDotAt(x, y) === nextFrom) {
+    state.dragging = true;
+    state.dragPos = { x, y };
+    render();
+  }
+});
 
-  if (hit === null) {
-    // Clicked empty space — deselect
-    state.selected = null;
-  } else if (state.selected === null) {
-    // No dot selected yet — select this one
-    state.selected = hit;
-  } else if (state.selected === hit) {
-    // Clicked same dot — deselect
-    state.selected = null;
-  } else {
-    // Second dot clicked — add connection (skip if pair already exists)
-    const a = state.selected, b = hit;
-    const exists = state.connections.some(([i, j]) => (i === a && j === b) || (i === b && j === a));
-    if (!exists) state.connections.push([a, b]);
-    state.selected = null;
+canvas.addEventListener('mousemove', (e) => {
+  if (!state.photo) return;
+  const { x, y } = getCanvasPos(e);
+
+  if (state.dragging) {
+    state.dragPos = { x, y };
+    render();
   }
 
+  const nextFrom = state.connections.length;
+  const hit = findDotAt(x, y);
+  if (state.dragging) {
+    canvas.style.cursor = 'crosshair';
+  } else {
+    canvas.style.cursor = (hit === nextFrom && nextFrom < state.dots.length - 1) ? 'grab' : 'default';
+  }
+});
+
+canvas.addEventListener('mouseup', (e) => {
+  if (!state.photo || !state.dragging) return;
+  const { x, y } = getCanvasPos(e);
+  const nextFrom = state.connections.length;
+  const nextTo = nextFrom + 1;
+  if (findDotAt(x, y) === nextTo) {
+    state.connections.push([nextFrom, nextTo]);
+  }
+  state.dragging = false;
+  state.dragPos = null;
   render();
 });
 
+// ─── Save ─────────────────────────────────────────────────────────────────────
 document.getElementById('save-btn').addEventListener('click', () => {
   if (!state.photo) return;
-
   const link = document.createElement('a');
   link.download = `constellation-${state.seed}.png`;
   link.href = canvas.toDataURL('image/png');
@@ -229,28 +277,53 @@ document.getElementById('save-btn').addEventListener('click', () => {
   document.body.removeChild(link);
 });
 
-canvas.addEventListener('mousemove', (e) => {
-  if (!state.photo) return;
-
-  const rect = canvas.getBoundingClientRect();
-  const x = (e.clientX - rect.left) * (canvas.width  / rect.width);
-  const y = (e.clientY - rect.top)  * (canvas.height / rect.height);
-
-  canvas.style.cursor = findDotAt(x, y) !== null ? 'pointer' : 'crosshair';
-});
-
-// ─── Dot generation & hit-testing ────────────────────────────────────────────
+// ─── Dot generation (contour-based) & hit-testing ────────────────────────────
 function generateDots() {
+  // Draw photo to offscreen canvas to read pixel data
+  const offscreen = document.createElement('canvas');
+  offscreen.width = canvas.width;
+  offscreen.height = canvas.height;
+  const octx = offscreen.getContext('2d');
+  octx.drawImage(state.photo, 0, 0, canvas.width, canvas.height);
+  const imageData = octx.getImageData(0, 0, canvas.width, canvas.height);
+
+  const edges = detectEdgePixels(imageData, canvas.width, canvas.height);
+
   const rand = mulberry32(state.seed);
-  const pad = 50;  // keep dots away from edges
-  state.dots = Array.from({ length: 15 }, () => ({
-    x: pad + rand() * (canvas.width  - pad * 2),
-    y: pad + rand() * (canvas.height - pad * 2),
-  }));
+  const minDist = Math.min(canvas.width, canvas.height) / 7;
+  const dots = [];
+
+  // Fisher-Yates shuffle with seeded PRNG to randomise which edge pixels we pick
+  for (let i = edges.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [edges[i], edges[j]] = [edges[j], edges[i]];
+  }
+
+  // Pick spread-out points from edge pixels
+  for (const candidate of edges) {
+    if (dots.length >= 15) break;
+    const tooClose = dots.some(d => {
+      const dx = d.x - candidate.x;
+      const dy = d.y - candidate.y;
+      return dx * dx + dy * dy < minDist * minDist;
+    });
+    if (!tooClose) dots.push({ x: candidate.x, y: candidate.y });
+  }
+
+  // Fallback: fill remaining slots with random dots if edge detection didn't yield enough
+  const pad = 50;
+  while (dots.length < 15) {
+    dots.push({
+      x: pad + rand() * (canvas.width  - pad * 2),
+      y: pad + rand() * (canvas.height - pad * 2),
+    });
+  }
+
+  state.dots = dots;
 }
 
 function findDotAt(x, y) {
-  const HIT = 22; // hit radius in canvas pixels — slightly larger than dot
+  const HIT = 22;
   for (let i = 0; i < state.dots.length; i++) {
     const dx = state.dots[i].x - x;
     const dy = state.dots[i].y - y;
@@ -259,6 +332,7 @@ function findDotAt(x, y) {
   return null;
 }
 
+// ─── Render ───────────────────────────────────────────────────────────────────
 function render() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -270,14 +344,13 @@ function render() {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
 
-  // 2. Lines
+  // 2. Completed lines
   if (state.connections.length > 0) {
-    ctx.strokeStyle = '#d97757';
+    ctx.strokeStyle = '#a855f7';
     ctx.lineWidth = 2;
-    ctx.shadowColor = '#d97757';
+    ctx.shadowColor = '#a855f7';
     ctx.shadowBlur = 10;
     ctx.lineCap = 'round';
-
     for (const [i, j] of state.connections) {
       ctx.beginPath();
       ctx.moveTo(state.dots[i].x, state.dots[i].y);
@@ -288,21 +361,46 @@ function render() {
     ctx.shadowColor = 'transparent';
   }
 
-  // 3. Dots
-  for (let i = 0; i < state.dots.length; i++) {
-    const { x, y } = state.dots[i];
-    const isSelected = state.selected === i;
-
+  // 3. Drag preview (dashed line from current dot to mouse)
+  if (state.dragging && state.dragPos) {
+    const from = state.dots[state.connections.length];
+    ctx.strokeStyle = '#a855f7';
+    ctx.lineWidth = 2;
+    ctx.shadowColor = '#a855f7';
+    ctx.shadowBlur = 6;
+    ctx.lineCap = 'round';
+    ctx.setLineDash([6, 8]);
     ctx.beginPath();
-    ctx.arc(x, y, isSelected ? 9 : 7, 0, Math.PI * 2);
-    ctx.fillStyle = '#d97757';
-    ctx.shadowColor = isSelected ? '#ff9944' : '#d97757';
-    ctx.shadowBlur = isSelected ? 24 : 14;
-    ctx.fill();
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(state.dragPos.x, state.dragPos.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = 'transparent';
   }
 
-  ctx.shadowBlur = 0;
-  ctx.shadowColor = 'transparent'; // reset shadow so it doesn't bleed into lines (Task 4)
+  // 4. Dots + number labels
+  const nextFrom = state.connections.length;
+  ctx.font = 'bold 12px system-ui';
+
+  for (let i = 0; i < state.dots.length; i++) {
+    const { x, y } = state.dots[i];
+    const isNext = i === nextFrom && nextFrom < state.dots.length - 1;
+    const radius = isNext ? 9 : 7;
+
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fillStyle = '#a855f7';
+    ctx.shadowColor = isNext ? '#d8b4fe' : '#a855f7';
+    ctx.shadowBlur = isNext ? 22 : 12;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = 'transparent';
+
+    // Number label
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(i + 1, x + 11, y - 7);
+  }
 }
   </script>
 </body>
